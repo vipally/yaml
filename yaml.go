@@ -91,11 +91,11 @@ func UnmarshalStrict(in []byte, out interface{}) (err error) {
 
 // An invalidUnmarshalError describes an invalid argument passed to Unmarshal.
 // (The argument to Unmarshal must be a non-nil pointer.)
-type invalidUnmarshalError struct {
+type InvalidUnmarshalError struct {
 	Type reflect.Type
 }
 
-func (e *invalidUnmarshalError) Error() string {
+func (e *InvalidUnmarshalError) Error() string {
 	if e.Type == nil {
 		return "yaml: Unmarshal(nil)"
 	}
@@ -136,7 +136,7 @@ func (dec *Decoder) SetStrict(strict bool) {
 func (dec *Decoder) Decode(v interface{}) (err error) {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
-		return &invalidUnmarshalError{reflect.TypeOf(v)}
+		return &InvalidUnmarshalError{reflect.TypeOf(v)}
 	}
 
 	d := newDecoder(dec.strict)
@@ -156,7 +156,7 @@ func (dec *Decoder) Decode(v interface{}) (err error) {
 func unmarshal(in []byte, out interface{}, strict bool) (err error) {
 	rv := reflect.ValueOf(out)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
-		return &invalidUnmarshalError{reflect.TypeOf(out)}
+		return &InvalidUnmarshalError{reflect.TypeOf(out)}
 	}
 
 	defer handleErr(&err)
