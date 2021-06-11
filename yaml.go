@@ -89,6 +89,23 @@ func UnmarshalStrict(in []byte, out interface{}) (err error) {
 	return unmarshal(in, out, true)
 }
 
+// An invalidUnmarshalError describes an invalid argument passed to Unmarshal.
+// (The argument to Unmarshal must be a non-nil pointer.)
+type invalidUnmarshalError struct {
+	Type reflect.Type
+}
+
+func (e *invalidUnmarshalError) Error() string {
+	if e.Type == nil {
+		return "yaml: Unmarshal(nil)"
+	}
+
+	if e.Type.Kind() != reflect.Ptr {
+		return "yaml: Unmarshal(non-pointer " + e.Type.String() + ")"
+	}
+	return "yaml: Unmarshal(nil " + e.Type.String() + ")"
+}
+
 // A Decoder reads and decodes YAML values from an input stream.
 type Decoder struct {
 	strict bool
@@ -117,17 +134,19 @@ func (dec *Decoder) SetStrict(strict bool) {
 // See the documentation for Unmarshal for details about the
 // conversion of YAML into a Go value.
 func (dec *Decoder) Decode(v interface{}) (err error) {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Ptr || rv.IsNil() {
+		return &invalidUnmarshalError{reflect.TypeOf(v)}
+	}
+
 	d := newDecoder(dec.strict)
 	defer handleErr(&err)
 	node := dec.parser.parse()
 	if node == nil {
 		return io.EOF
 	}
-	out := reflect.ValueOf(v)
-	if out.Kind() == reflect.Ptr && !out.IsNil() {
-		out = out.Elem()
-	}
-	d.unmarshal(node, out)
+
+	d.unmarshal(node, rv.Elem())
 	if len(d.terrors) > 0 {
 		return &TypeError{d.terrors}
 	}
@@ -135,17 +154,18 @@ func (dec *Decoder) Decode(v interface{}) (err error) {
 }
 
 func unmarshal(in []byte, out interface{}, strict bool) (err error) {
+	rv := reflect.ValueOf(out)
+	if rv.Kind() != reflect.Ptr || rv.IsNil() {
+		return &invalidUnmarshalError{reflect.TypeOf(out)}
+	}
+
 	defer handleErr(&err)
 	d := newDecoder(strict)
 	p := newParser(in)
 	defer p.destroy()
 	node := p.parse()
 	if node != nil {
-		v := reflect.ValueOf(out)
-		if v.Kind() == reflect.Ptr && !v.IsNil() {
-			v = v.Elem()
-		}
-		d.unmarshal(node, v)
+		d.unmarshal(node, rv.Elem())
 	}
 	if len(d.terrors) > 0 {
 		return &TypeError{d.terrors}
